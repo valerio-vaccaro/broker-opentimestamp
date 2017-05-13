@@ -43,26 +43,19 @@ else:
             queue=queue_name,
             routing_key='', arguments=headers)
 
+#fout = open('/tmp/last_consumed', 'w+')
 
 def callback(ch, method, properties, body):
-    print("Received %r/%r/%r" % (body, method.routing_key, str(properties.headers)))
+    print("Received '%r'" % (str(body)))
+    #print(body, file=fout)
     if (waitsec > 0.0):
         time.sleep(waitsec)
-    bodynum = int(body.split(' ')[0])
-    if not (bodynum % modulo):
-        ch.basic_ack(method.delivery_tag)
-        print("Explicitly acked " + body)
+    ch.basic_ack(method.delivery_tag)
 
 channel.basic_qos(prefetch_count=prefetch)
 channel.basic_consume(callback,queue=queue_name)
 
-print('Waiting for messages on "'
-        + exchange_name
-        + '" (RKs: '
-        + ','.join(routing_keys)
-        + '; HDRs: '
-        + str(headers)
-        + '). To exit press CTRL+C')
+print('Waiting for messages on "' + exchange_name + '"')
 channel.start_consuming()
 
 connection.close()

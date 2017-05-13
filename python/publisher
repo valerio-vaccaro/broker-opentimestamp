@@ -43,7 +43,6 @@ for x in range(int(start), int(stop) + 1, int(step)):
             routing_key=routing_key,
             body=body,
             properties=pika.BasicProperties(headers=headers, delivery_mode = 2))
-    print("Sent '" + body + "' to '" + exchange_name 
-            + "' (RK: " + routing_key + "; HDRs: " + str(headers) + ")")
+    print("Sent '" + body + "' to '" + exchange_name + "'")
 
 connection.close()

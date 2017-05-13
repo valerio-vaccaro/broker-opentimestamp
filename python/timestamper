@@ -3,6 +3,16 @@ import pika
 import os
 import sys
 import time
+import subprocess as sub
+import json
+import base64
+
+#from opentimestamps.core.timestamp import Timestamp
+#from opentimestamps.core.op import OpAppend, OpSHA256
+#from opentimestamps.core.serialize import BytesSerializationContext, BytesDeserializationContext
+
+#import opentimestamps
+# "https://a.pool.opentimestamps.org", "https://b.pool.opentimestamps.org", "https://a.pool.eternitywall.com"
 
 # ENV imports
 broker = os.getenv('BROKER', 'broker')
@@ -35,13 +45,21 @@ channel.queue_bind(exchange=iexchange_name,
 
 def callback(ch, method, properties, body):
     print("Received %r/%r/%r" % (body, method.routing_key, str(properties.headers)))
+    #ts = 
+    # Ad un certo punto dovrei avere:
+    # DetachedTimestampFile.from_fd(OpSHA256(), fd) ora forse non from FD ;-)
+    p = sub.run(args = ['./opentimestamps-client/ots', 'stamp'], input=body, stdout=sub.PIPE, shell=False)
+    #sub.Popen('./opentimestamps-client/ots stamp', stdin=str(body), stdout=sub.PIPE, stderr=sub.PIPE, shell=True)
+    #print(">>>>>>>>>>>>>" + str(p.stdout))
+    #print("2>2>2>2>2>2>2" + str(p.stderr))
+    ots_base64 = str(base64.b64encode(p.stdout))
     channel.basic_publish(
             exchange='ingress_timestamped',
             routing_key=method.routing_key,
-            body=body,
+            body=json.dumps({'data': str(body), 'ots': ots_base64}),
             properties=pika.BasicProperties(headers=properties.headers, delivery_mode = 2))
     ch.basic_ack(method.delivery_tag)
-    print("Explicitly acked " + body)
+    print("Explicitly acked " + str(body))
 
 channel.basic_qos(prefetch_count=prefetch)
 channel.basic_consume(callback,queue=queue_name)
