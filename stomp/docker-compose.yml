@@ -1,0 +1,9 @@
+version: '2.1'
+
+services:
+  web:
+    image: nginx
+    volumes:
+      - .:/usr/share/nginx/html:ro
+    ports:
+      - 80

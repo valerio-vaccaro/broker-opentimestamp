@@ -1,0 +1,20 @@
+version: '2.1'
+
+networks:
+  bridge: {}
+
+volumes:
+  rabbitdatadir: {}
+
+services:
+  broker:
+    image: rabbitmq:management
+    volumes:
+      - rabbitdatadir:/var/lib/rabbitmq:rw
+    networks:
+      - bridge
+    domainname: example.com
+    hostname: rabbit1
+    ports:
+      - 15672:15672
+      - 15674:15674

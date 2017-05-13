@@ -1,0 +1,16 @@
+1. Start:
+   > docker-compose up -d
+   > docker-compose ps
+   > docker-compose exec broker rabbitmq-plugins list
+   And in case, enable stomp:
+   > docker-compose exec broker rabbitmq-plugins enable rabbitmq_web_stomp
+   Finally start the webserver:
+   > docker-compose -f stomp/docker-compose.yml up -d
+2. Start the server (will declare the queue!)
+   > docker-compose run rpc-server
+3. Start the client:
+   > local_port=$(docker-compose -f stomp/docker-compose.yml port web 80 | cut -d : -f 2)
+   > firefox -jsconsole http://localhost:${local_port}/ &
+4. Clean up
+   > docker-compose down --volume
+   > docker-compose -f stomp/docker-compose.yml down

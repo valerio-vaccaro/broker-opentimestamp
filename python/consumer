@@ -1,0 +1,72 @@
+#!/usr/bin/env python
+import pika
+import os
+import sys
+import time
+
+# Command line parsing
+modulo = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+
+# ENV imports
+broker = os.getenv('BROKER', 'broker')
+waitsec = float(os.getenv('WAITMS', '0.0')) / 1000.0
+prefetch = int(os.getenv('PREFETCH', '0'))
+routing_keys = os.getenv('ROUTING_KEYS', '').split(' ')
+if len(os.getenv('HEADERS', '')) > 0:
+    headers = dict(s.split('=') for s in os.getenv('HEADERS', '').split(' '))
+else:
+    headers = {}
+
+# Main processing
+conn_param= pika.ConnectionParameters(
+    host = broker,
+    credentials = pika.credentials.PlainCredentials('guest','guest'))
+
+connection = pika.BlockingConnection(conn_param)
+
+channel = connection.channel()
+
+if len(headers) == 0:
+    exchange_name='egress_topic'
+    exchange_type='topic'
+else:
+    exchange_name='egress_headers'
+    exchange_type='headers'
+channel.exchange_declare(exchange=exchange_name, type=exchange_type, durable=True)
+
+result = channel.queue_declare(exclusive=True)
+queue_name = result.method.queue
+
+if len(headers) == 0:
+    for rk in routing_keys:
+        channel.queue_bind(exchange=exchange_name,
+                queue=queue_name,
+                routing_key=rk, arguments=headers)
+else:
+    channel.queue_bind(exchange=exchange_name,
+            queue=queue_name,
+            routing_key='', arguments=headers)
+
+
+def callback(ch, method, properties, body):
+    print("Received %r/%r/%r" % (body, method.routing_key, str(properties.headers)))
+    if (waitsec > 0.0):
+        time.sleep(waitsec)
+    bodynum = int(body.split(' ')[0])
+    if not (bodynum % modulo):
+        ch.basic_ack(method.delivery_tag)
+        print("Explicitly acked " + body)
+
+channel.basic_qos(prefetch_count=prefetch)
+channel.basic_consume(callback,queue=queue_name)
+
+print('Waiting for messages on "'
+        + queue_name
+        + '" (RKs: '
+        + ','.join(routing_keys)
+        + '; HDRs: '
+        + str(headers)
+        + '). To exit press CTRL+C')
+channel.start_consuming()
+
+connection.close()

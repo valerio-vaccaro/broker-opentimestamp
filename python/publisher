@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+import pika
+import sys
+import os
+import time
+
+# Commandline parameters (mimicking "seq")
+if len(sys.argv) < 2:
+    exit(0)
+
+stop = sys.argv.pop()
+step = sys.argv.pop()  if len(sys.argv) > 2  else "1"
+start = sys.argv.pop() if len(sys.argv) > 1  else "1"
+
+# ENV imports
+broker = os.getenv('BROKER', 'broker')
+sender = os.getenv('SENDER', os.environ['HOSTNAME'])
+waitsec = float(os.getenv('WAITMS', '0.0')) / 1000.00
+routing_key = os.getenv('ROUTING_KEY', '')
+if len(os.getenv('HEADERS', '')) > 0:
+    headers = dict(s.split('=') for s in os.getenv('HEADERS', '').split(' '))
+else:
+    headers = {}
+
+# Main processing
+conn_param= pika.ConnectionParameters(
+    host = broker,
+    credentials = pika.credentials.PlainCredentials('guest','guest'))
+
+connection = pika.BlockingConnection(conn_param)
+
+channel = connection.channel()
+
+exchange_name = 'ingress'
+channel.exchange_declare(exchange=exchange_name, type='fanout', durable=True)
+
+for x in range(int(start), int(stop) + 1, int(step)):
+    if (waitsec > 0.0):
+        time.sleep(waitsec)
+    body = str(x) + " from " + sender
+    channel.basic_publish(
+            exchange=exchange_name,
+            routing_key=routing_key,
+            body=body,
+            properties=pika.BasicProperties(headers=headers, delivery_mode = 2))
+    print("Sent '" + body + "' to '" + exchange_name 
+            + "' (RK: " + routing_key + "; HDRs: " + str(headers) + ")")
+
+connection.close()
