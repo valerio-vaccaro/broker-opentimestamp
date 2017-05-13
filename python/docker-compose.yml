@@ -4,13 +4,6 @@ networks:
   bridge: {}
 
 services:
-  rpc-server:
-    extends:
-      file: ./python/pika.yml
-      service: pika
-    entrypoint: ./rpc-server
-    links:
-      - broker
   publisher:
     extends:
       file: ./python/pika.yml
