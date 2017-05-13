@@ -1,13 +1,32 @@
 1. Start:
    > docker-compose up -d
    > docker-compose ps
+
+2. docker-compose run -e WAITMS=1000 publisher 1 1000
+2. docker-compose run timestamper
+2. docker-compose run consumer
+2. docker-compose run -e EXCHANGE_NAME=ingress consumer
+
    > docker-compose exec broker rabbitmq-plugins list
    And in case, enable stomp:
    > docker-compose exec broker rabbitmq-plugins enable rabbitmq_web_stomp
    Finally start the webserver:
    > docker-compose -f stomp/docker-compose.yml up -d
+2. Administratively prepare broker topology:
+   docker-compose -f docker-compose.yml -f admin/admin.yml run rabbitmqadmin \
+         -H broker declare exchange name=ingress type=fanout durable=true
+   docker-compose -f docker-compose.yml -f admin/admin.yml run rabbitmqadmin \
+         -H broker declare exchange name=egress_headers type=headers durable=true
+   docker-compose -f docker-compose.yml -f admin/admin.yml run rabbitmqadmin \
+         -H broker declare exchange name=egress_topic type=topic durable=true
+   docker-compose -f docker-compose.yml -f admin/admin.yml run rabbitmqadmin \
+         -H broker declare binding source=ingress destination=egress_topic destination_type=exchange
+   docker-compose -f docker-compose.yml -f admin/admin.yml run rabbitmqadmin \
+         -H broker declare binding source=ingress destination=egress_headers destination_type=exchange
+   docker-compose -f docker-compose.yml -f admin/admin.yml run rabbitmqadmin \
+         -H broker declare binding source=egress_headers destination=notification
 2. Start the server (will declare the queue!)
-   > docker-compose run rpc-server
+   > docker-compose exec -e WAITMS=500 publisher 1 100
 3. Start the client:
    > local_port=$(docker-compose -f stomp/docker-compose.yml port web 80 | cut -d : -f 2)
    > firefox -jsconsole http://localhost:${local_port}/ &

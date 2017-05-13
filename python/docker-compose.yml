@@ -18,3 +18,10 @@ services:
     entrypoint: ./consumer
     links:
       - broker
+  timestamper:
+    extends:
+      file: ./python/pika.yml
+      service: pika
+    entrypoint: ./timestamper
+    links:
+      - broker

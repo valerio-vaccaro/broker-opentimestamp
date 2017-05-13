@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+import pika
+import os
+import sys
+import time
+
+# ENV imports
+broker = os.getenv('BROKER', 'broker')
+waitsec = float(os.getenv('WAITMS', '0.0')) / 1000.0
+prefetch = int(os.getenv('PREFETCH', '0'))
+routing_keys = os.getenv('ROUTING_KEYS', '').split(' ')
+if len(os.getenv('HEADERS', '')) > 0:
+    headers = dict(s.split('=') for s in os.getenv('HEADERS', '').split(' '))
+else:
+    headers = {}
+
+# Main processing
+conn_param= pika.ConnectionParameters(
+    host = broker,
+    credentials = pika.credentials.PlainCredentials('guest','guest'))
+
+connection = pika.BlockingConnection(conn_param)
+
+channel = connection.channel()
+
+iexchange_name='ingress'
+iexchange_type='fanout'
+channel.exchange_declare(exchange=iexchange_name, type=iexchange_type, durable=True)
+
+result = channel.queue_declare(exclusive=True)
+queue_name = result.method.queue
+
+channel.queue_bind(exchange=iexchange_name,
+        queue=queue_name)
+
+def callback(ch, method, properties, body):
+    print("Received %r/%r/%r" % (body, method.routing_key, str(properties.headers)))
+    channel.basic_publish(
+            exchange='ingress_timestamped',
+            routing_key=method.routing_key,
+            body=body,
+            properties=pika.BasicProperties(headers=properties.headers, delivery_mode = 2))
+    ch.basic_ack(method.delivery_tag)
+    print("Explicitly acked " + body)
+
+channel.basic_qos(prefetch_count=prefetch)
+channel.basic_consume(callback,queue=queue_name)
+
+#print('Waiting for messages on "'
+        #+ queue_name
+        #+ '" (RKs: '
+        #+ ','.join(routing_keys)
+        #+ '; HDRs: '
+        #+ str(headers)
+        #+ '). To exit press CTRL+C')
+channel.start_consuming()
+
+connection.close()

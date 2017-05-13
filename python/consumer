@@ -12,6 +12,8 @@ broker = os.getenv('BROKER', 'broker')
 waitsec = float(os.getenv('WAITMS', '0.0')) / 1000.0
 prefetch = int(os.getenv('PREFETCH', '0'))
 routing_keys = os.getenv('ROUTING_KEYS', '').split(' ')
+exchange_name = os.getenv('EXCHANGE_NAME', 'ingress_timestamped')
+exchange_type = os.getenv('EXCHANGE_TYPE', 'fanout')
 if len(os.getenv('HEADERS', '')) > 0:
     headers = dict(s.split('=') for s in os.getenv('HEADERS', '').split(' '))
 else:
@@ -26,12 +28,6 @@ connection = pika.BlockingConnection(conn_param)
 
 channel = connection.channel()
 
-if len(headers) == 0:
-    exchange_name='egress_topic'
-    exchange_type='topic'
-else:
-    exchange_name='egress_headers'
-    exchange_type='headers'
 channel.exchange_declare(exchange=exchange_name, type=exchange_type, durable=True)
 
 result = channel.queue_declare(exclusive=True)
@@ -61,7 +57,7 @@ channel.basic_qos(prefetch_count=prefetch)
 channel.basic_consume(callback,queue=queue_name)
 
 print('Waiting for messages on "'
-        + queue_name
+        + exchange_name
         + '" (RKs: '
         + ','.join(routing_keys)
         + '; HDRs: '
