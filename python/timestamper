@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+import pika
+import os
+import sys
+import time
+import subprocess as sub
+import json
+import base64
+
+#from opentimestamps.core.timestamp import Timestamp
+#from opentimestamps.core.op import OpAppend, OpSHA256
+#from opentimestamps.core.serialize import BytesSerializationContext, BytesDeserializationContext
+
+#import opentimestamps
+# "https://a.pool.opentimestamps.org", "https://b.pool.opentimestamps.org", "https://a.pool.eternitywall.com"
+
+# ENV imports
+broker = os.getenv('BROKER', 'broker')
+waitsec = float(os.getenv('WAITMS', '0.0')) / 1000.0
+prefetch = int(os.getenv('PREFETCH', '0'))
+routing_keys = os.getenv('ROUTING_KEYS', '').split(' ')
+if len(os.getenv('HEADERS', '')) > 0:
+    headers = dict(s.split('=') for s in os.getenv('HEADERS', '').split(' '))
+else:
+    headers = {}
+
+# Main processing
+conn_param= pika.ConnectionParameters(
+    host = broker,
+    credentials = pika.credentials.PlainCredentials('guest','guest'))
+
+connection = pika.BlockingConnection(conn_param)
+
+channel = connection.channel()
+
+iexchange_name='ingress'
+iexchange_type='fanout'
+channel.exchange_declare(exchange=iexchange_name, type=iexchange_type, durable=True)
+
+result = channel.queue_declare(exclusive=True)
+queue_name = result.method.queue
+
+channel.queue_bind(exchange=iexchange_name,
+        queue=queue_name)
+
+def callback(ch, method, properties, body):
+    print("Received %r/%r/%r" % (body, method.routing_key, str(properties.headers)))
+    #ts = 
+    # Ad un certo punto dovrei avere:
+    # DetachedTimestampFile.from_fd(OpSHA256(), fd) ora forse non from FD ;-)
+    p = sub.run(args = ['./opentimestamps-client/ots', 'stamp'], input=body, stdout=sub.PIPE, shell=False)
+    #sub.Popen('./opentimestamps-client/ots stamp', stdin=str(body), stdout=sub.PIPE, stderr=sub.PIPE, shell=True)
+    #print(">>>>>>>>>>>>>" + str(p.stdout))
+    #print("2>2>2>2>2>2>2" + str(p.stderr))
+    ots_base64 = str(base64.b64encode(p.stdout))
+    channel.basic_publish(
+            exchange='ingress_timestamped',
+            routing_key=method.routing_key,
+            body=json.dumps({'data': str(body), 'ots': ots_base64}),
+            properties=pika.BasicProperties(headers=properties.headers, delivery_mode = 2))
+    ch.basic_ack(method.delivery_tag)
+    print("Explicitly acked " + str(body))
+
+channel.basic_qos(prefetch_count=prefetch)
+channel.basic_consume(callback,queue=queue_name)
+
+#print('Waiting for messages on "'
+        #+ queue_name
+        #+ '" (RKs: '
+        #+ ','.join(routing_keys)
+        #+ '; HDRs: '
+        #+ str(headers)
+        #+ '). To exit press CTRL+C')
+channel.start_consuming()
+
+connection.close()

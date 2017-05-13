@@ -5,7 +5,7 @@ networks:
 
 services:
   pika:
-    image: pika
+    image: pika:3
     build: .
     networks:
       - bridge

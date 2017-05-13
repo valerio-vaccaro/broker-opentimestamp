@@ -1,0 +1,23 @@
+version: '2.1'
+
+networks:
+  bridge: {}
+
+volumes:
+  rabbitdatadir: {}
+
+services:
+  rabbitmqadmin:
+    image: python:2
+    working_dir: /usr/src/myapp
+    volumes:
+      - ./admin:/usr/src/myapp:ro
+    entrypoint: ./rabbitmqadmin
+    command:
+      - "--help"
+    networks:
+      - bridge
+    domainname: example.com
+    hostname: admin
+    links:
+      - broker
