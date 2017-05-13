@@ -1,0 +1,67 @@
+<html>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <head>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/0.3.4/sockjs.min.js"></script>
+        <script src="stomp.js"></script>
+        <style type="text/css">
+            .principal {
+                display: inline-block;
+                width: 33%;
+                vertical-align: top;
+            }
+            .principal .title{
+                background-color: red;
+                color: white;
+                margin: 20px;
+                text-align:center;
+            }
+            .notification-single {
+                display: inline-block;
+                padding: 20px;
+                margin: 30px;
+                border: #9E9E9E;
+                border-width: medium;
+                border-style: solid;
+                opacity: 10;
+            }
+        </style>
+        <script>
+            var ws = null;
+            if (Modernizr.websockets)
+                ws = new WebSocket('ws://127.0.0.1:15674/ws');
+            else
+                ws = new SockJS('http://127.0.0.1:15674/stomp');
+            var client = Stomp.over(ws);
+
+            callback = function(message) {
+                // called when the client receives a STOMP message from the server
+                if (message.body) {
+                    alert("got message with body " + message.body)
+                } else {
+                    alert("got empty message");
+                }
+            };
+            i=0;
+            function onSubmit() {
+                i=i+1;
+                var command=jQuery(".command input[name=cmd]").val();
+                client.send("/queue/system_command", {priority: 9, 'reply-to': '/temp-queue/test', correlation_id: '' + i}, command);
+                return false;
+            }
+            client.connect('guest', 'guest', ()=>{}, ()=>{console.log("error")}, '/');
+            client.onreceive=(message)=>{
+                console.log(message);
+                jQuery(".command .result").empty().text(message.body);
+            };
+        </script>
+    </head>
+    <body>
+        <p>Hi, please ask anything to be executed on the <b>server</b>!</p>
+        <div class="command">
+            <input type="button" value="send command" onclick="javascript: onSubmit()"><input type="text" name="cmd">
+            <pre class="result">...no command executed...</pre>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,27 @@
+version: '2.1'
+
+networks:
+  bridge: {}
+
+services:
+  rpc-server:
+    extends:
+      file: ./python/pika.yml
+      service: pika
+    entrypoint: ./rpc-server
+    links:
+      - broker
+  publisher:
+    extends:
+      file: ./python/pika.yml
+      service: pika
+    entrypoint: ./publisher
+    links:
+      - broker
+  consumer:
+    extends:
+      file: ./python/pika.yml
+      service: pika
+    entrypoint: ./consumer
+    links:
+      - broker
